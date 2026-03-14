@@ -1,55 +1,90 @@
 import os
-import google.generativeai as genai
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 
-# Configure your API Key
-genai.configure(api_key="YOUR_GEMINI_API_KEY")
+# =============================
+# LOAD ENV
+# =============================
+load_dotenv()
+
+API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not API_KEY:
+    raise ValueError("GEMINI_API_KEY not found in .env")
+
+# =============================
+# GEMINI CLIENT
+# =============================
+client = genai.Client(api_key=API_KEY)
+
 
 def get_first_aid_advice(symptoms):
     """
-    Python version of the First Aid AI module.
-    Takes symptoms (list or string) and returns clear, actionable bullet points.
+    First Aid AI module.
+    Returns emergency first aid instructions.
     """
-    
-    # Initialize the model
-    model = genai.GenerativeModel('gemini-1.5-flash')
 
-    # Ensure symptoms is a readable string
     symptoms_str = ", ".join(symptoms) if isinstance(symptoms, list) else symptoms
 
     prompt = f"""
-    You are an emergency medical assistant.
-    Provide immediate, short, and life-saving first aid advice based on the symptoms provided.
-    
-    Symptoms:
-    {symptoms_str}
+You are an emergency medical assistant.
 
-    Return the response as clear, concise bullet points only. 
-    Keep it strictly medical and urgent.
-    """
+Provide immediate life-saving first aid advice.
+
+Symptoms:
+{symptoms_str}
+
+Return ONLY bullet points.
+"""
 
     try:
-        # Generate content
-        response = model.generate_content(prompt)
-        advice = response.text.strip()
-        
-        # Fallback if AI returns empty or nonsense
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0
+            )
+        )
+
+        # extract text safely
+        advice = ""
+
+        if response.candidates:
+            advice = response.candidates[0].content.parts[0].text
+
+        advice = advice.strip()
+
         if not advice:
-            return "• Stay calm.\n• Call emergency services immediately.\n• Monitor the patient's breathing."
-            
+            return (
+                "• Stay calm.\n"
+                "• Call emergency services immediately.\n"
+                "• Monitor breathing."
+            )
+
         return advice
-        
+
     except Exception as e:
-        # Fallback in case of API issues
+
+        print("FirstAid AI Error:", e)
+
         return (
             "• Alert emergency responders immediately.\n"
             "• Ensure the patient is in a safe environment.\n"
-            "• Do not give the patient anything to eat or drink until help arrives."
+            "• Monitor breathing until help arrives."
         )
 
+
 # =============================
-# QUICK TEST
+# TEST
 # =============================
 if __name__ == "__main__":
-    test_symptoms = ["chest pain", "shortness of breath", "fainting"]
-    print("--- FIRST AID ADVICE ---")
-    print(get_first_aid_advice(test_symptoms))
+
+    symptoms = [
+        "chest pain",
+        "shortness of breath",
+        "fainting"
+    ]
+
+    print(get_first_aid_advice(symptoms))
