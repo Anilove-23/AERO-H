@@ -1,60 +1,73 @@
 import os
 import json
-import google.generativeai as genai
+from dotenv import load_dotenv
+from google import genai
 
-# Configure your API Key
-# In a hackathon, you can use: os.getenv("GEMINI_API_KEY") 
-genai.configure(api_key="YOUR_GEMINI_API_KEY")
+# =============================
+# LOAD ENV VARIABLES
+# =============================
+load_dotenv()
+
+API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not API_KEY:
+    raise ValueError("GEMINI_API_KEY not found in .env")
+
+# =============================
+# CREATE GEMINI CLIENT
+# =============================
+client = genai.Client(api_key=API_KEY)
+
 
 def analyze_emergency(message):
     """
-    Python version of the Triage AI module.
-    Analyzes patient messages and returns structured JSON.
+    AI triage system that extracts structured emergency data
+    from a patient message.
     """
-    
-    # Initialize the model
-    model = genai.GenerativeModel('gemini-1.5-flash')
 
     prompt = f"""
-    You are an emergency medical triage assistant.
-    Extract structured information from the patient message.
-    
-    Return JSON ONLY with these fields:
-    - severity_score (1-10)
-    - priority (low, medium, high, critical)
-    - symptoms (array)
-    - required_specialization
-    - possible_condition
+You are an emergency medical triage assistant.
 
-    Message:
-    "{message}"
-    """
+Extract structured information from the patient message.
+
+Return JSON ONLY with these fields:
+- severity_score (1-10)
+- priority (low, medium, high, critical)
+- symptoms (array)
+- required_specialization
+- possible_condition
+
+Message:
+"{message}"
+"""
 
     try:
-        # Generate content
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+
         text = response.text
-        
-        # CLEANUP: Remove markdown formatting if present
+
+        # Remove markdown formatting if Gemini adds it
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             text = text.split("```")[1].split("```")[0].strip()
-            
-        # Parse and return
+
         return json.loads(text)
-        
+
     except Exception as e:
-        # Fallback in case of AI failure or parsing error
         return {
             "error": "AI parsing failed",
             "details": str(e),
-            "severity_score": 5,  # Default to medium if error
+            "severity_score": 5,
             "priority": "medium",
             "symptoms": [],
             "required_specialization": "general",
             "possible_condition": "unknown"
         }
+
 
 # =============================
 # QUICK TEST
