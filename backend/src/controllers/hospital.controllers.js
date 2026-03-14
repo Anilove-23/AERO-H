@@ -1,6 +1,8 @@
 import { Hospital } from "../models/hospital.model.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
+import { io } from "../server.js";
+
 
 // ─────────────────────────────────────────
 // Create Hospital
@@ -8,59 +10,65 @@ import ApiError from "../utils/ApiError.js";
 // ─────────────────────────────────────────
 export const createHospital = asyncHandler(async (req, res) => {
 
-const { name, address, lat, lng, contactNumber } = req.body;
+  const { name, address, lat, lng, contactNumber } = req.body;
 
-if (!name || !lat || !lng)
-throw new ApiError("Hospital name and location required", 400);
+  if (!name || !lat || !lng)
+    throw new ApiError("Hospital name and location required", 400);
 
-const hospital = await Hospital.create({
-name,
-address,
-contactNumber,
-location: {
-type: "Point",
-coordinates: [lng, lat]
-}
+  const hospital = await Hospital.create({
+    name,
+    address,
+    contactNumber,
+    location: {
+      type: "Point",
+      coordinates: [lng, lat]
+    }
+  });
+
+  // 🔴 REALTIME EVENT
+  io.emit("hospital:new", hospital);
+
+  res.status(201).json({
+    status: "success",
+    hospital
+  });
+
 });
 
-res.status(201).json({
-status: "success",
-hospital
-});
-
-});
 
 // ─────────────────────────────────────────
 // Get All Hospitals
 // ─────────────────────────────────────────
 export const getHospitals = asyncHandler(async (_req, res) => {
 
-const hospitals = await Hospital.find();
+  const hospitals = await Hospital.find();
 
-res.status(200).json({
-status: "success",
-results: hospitals.length,
-hospitals
+  res.status(200).json({
+    status: "success",
+    results: hospitals.length,
+    hospitals
+  });
+
 });
 
-});
 
 // ─────────────────────────────────────────
 // Get Hospital By ID
 // ─────────────────────────────────────────
 export const getHospitalById = asyncHandler(async (req, res) => {
 
-const hospital = await Hospital.findById(req.params.id);
+  const hospital = await Hospital.findById(req.params.id);
 
-if (!hospital)
-throw new ApiError("Hospital not found", 404);
+  if (!hospital)
+    throw new ApiError("Hospital not found", 404);
 
-res.status(200).json({
-status: "success",
-hospital
+  res.status(200).json({
+    status: "success",
+    hospital
+  });
+
 });
 
-});
 
 // ─────────────────────────────────────────
 // Update Hospital
@@ -68,21 +76,25 @@ hospital
 // ─────────────────────────────────────────
 export const updateHospital = asyncHandler(async (req, res) => {
 
-const hospital = await Hospital.findByIdAndUpdate(
-req.params.id,
-req.body,
-{ new: true, runValidators: true }
-);
+  const hospital = await Hospital.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true, runValidators: true }
+  );
 
-if (!hospital)
-throw new ApiError("Hospital not found", 404);
+  if (!hospital)
+    throw new ApiError("Hospital not found", 404);
 
-res.status(200).json({
-status: "success",
-hospital
+  // 🔴 REALTIME EVENT
+  io.emit("hospital:updated", hospital);
+
+  res.status(200).json({
+    status: "success",
+    hospital
+  });
+
 });
 
-});
 
 // ─────────────────────────────────────────
 // Delete Hospital
@@ -90,17 +102,23 @@ hospital
 // ─────────────────────────────────────────
 export const deleteHospital = asyncHandler(async (req, res) => {
 
-const hospital = await Hospital.findByIdAndDelete(req.params.id);
+  const hospital = await Hospital.findByIdAndDelete(req.params.id);
 
-if (!hospital)
-throw new ApiError("Hospital not found", 404);
+  if (!hospital)
+    throw new ApiError("Hospital not found", 404);
 
-res.status(200).json({
-status: "success",
-message: "Hospital deleted"
+  // 🔴 REALTIME EVENT
+  io.emit("hospital:deleted", {
+    hospitalId: hospital._id
+  });
+
+  res.status(200).json({
+    status: "success",
+    message: "Hospital deleted"
+  });
+
 });
 
-});
 
 // ─────────────────────────────────────────
 // Get Nearby Hospitals
@@ -108,30 +126,31 @@ message: "Hospital deleted"
 // ─────────────────────────────────────────
 export const getNearbyHospitals = asyncHandler(async (req, res) => {
 
-const { lat, lng } = req.query;
+  const { lat, lng } = req.query;
 
-if (!lat || !lng)
-throw new ApiError("Latitude and longitude required", 400);
+  if (!lat || !lng)
+    throw new ApiError("Latitude and longitude required", 400);
 
-const hospitals = await Hospital.find({
-location: {
-$near: {
-$geometry: {
-type: "Point",
-coordinates: [parseFloat(lng), parseFloat(lat)]
-},
-$maxDistance: 10000
-}
-}
+  const hospitals = await Hospital.find({
+    location: {
+      $near: {
+        $geometry: {
+          type: "Point",
+          coordinates: [parseFloat(lng), parseFloat(lat)]
+        },
+        $maxDistance: 10000
+      }
+    }
+  });
+
+  res.status(200).json({
+    status: "success",
+    results: hospitals.length,
+    hospitals
+  });
+
 });
 
-res.status(200).json({
-status: "success",
-results: hospitals.length,
-hospitals
-});
-
-});
 
 // ─────────────────────────────────────────
 // Update Hospital Capacity
@@ -139,28 +158,35 @@ hospitals
 // ─────────────────────────────────────────
 export const updateHospitalCapacity = asyncHandler(async (req, res) => {
 
-const { icuBedsAvailable, erCapacity, ventilatorsAvailable } = req.body;
+  const { icuBedsAvailable, erCapacity, ventilatorsAvailable } = req.body;
 
-const hospital = await Hospital.findById(req.params.id);
+  const hospital = await Hospital.findById(req.params.id);
 
-if (!hospital)
-throw new ApiError("Hospital not found", 404);
+  if (!hospital)
+    throw new ApiError("Hospital not found", 404);
 
-if (icuBedsAvailable !== undefined)
-hospital.icuBedsAvailable = icuBedsAvailable;
+  if (icuBedsAvailable !== undefined)
+    hospital.icuBedsAvailable = icuBedsAvailable;
 
-if (erCapacity !== undefined)
-hospital.erCapacity = erCapacity;
+  if (erCapacity !== undefined)
+    hospital.erCapacity = erCapacity;
 
-if (ventilatorsAvailable !== undefined)
-hospital.ventilatorsAvailable = ventilatorsAvailable;
+  if (ventilatorsAvailable !== undefined)
+    hospital.ventilatorsAvailable = ventilatorsAvailable;
 
-await hospital.save();
+  await hospital.save();
 
-res.status(200).json({
-status: "success",
-hospital
+  // 🔴 REALTIME EVENT
+  io.emit("hospital:capacityUpdated", {
+    hospitalId: hospital._id,
+    icuBedsAvailable: hospital.icuBedsAvailable,
+    erCapacity: hospital.erCapacity,
+    ventilatorsAvailable: hospital.ventilatorsAvailable
+  });
+
+  res.status(200).json({
+    status: "success",
+    hospital
+  });
+
 });
-
-});
-

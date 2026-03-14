@@ -28,6 +28,8 @@ app.use(express.json());
 
 app.use(cookieParser());
 
+app.use("/audio",express.static("public/audio"))
+
 // ─────────────────────────────────────────
 // Health Check Route
 // ─────────────────────────────────────────
@@ -52,6 +54,9 @@ app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/blood", bloodRoutes);
 app.use("/api/v1/simulation", simulationRoutes);
 
+// Voice Routes
+import voiceRoutes from './routes/voice.routes.js'
+app.use("/api/v1/voice",voiceRoutes)
 // ─────────────────────────────────────────
 // Error Handling
 // ─────────────────────────────────────────

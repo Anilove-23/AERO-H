@@ -61,73 +61,97 @@ const emergencyCaseSchema = new mongoose.Schema(
       default: null
     },
 
+    // Useful for demo / testing
     isSimulation: {
       type: Boolean,
       default: false
     },
 
+    // Emergency lifecycle
     status: {
       type: String,
       enum: [
         "reported",
         "triaged",
+        "hospital_assigned",
+        "ambulance_dispatched",
         "ambulance_assigned",
         "in_transit",
+        "doctor_assigned",
         "treated",
         "closed"
       ],
       default: "reported"
+    },
+
+    // Optional AI debug info
+    aiDecisionMeta: {
+      hospitalScore: Number,
+      ambulanceScore: Number,
+      doctorScore: Number
     }
   },
   { timestamps: true }
 );
 
 
-// GEO INDEX → find nearest hospitals/ambulances
+// ─────────────────────────────────────────
+// INDEXES
+// ─────────────────────────────────────────
+
+// GEO INDEX → find nearest hospitals / ambulances
 emergencyCaseSchema.index({ location: "2dsphere" });
+
+// Query active emergencies quickly
 emergencyCaseSchema.index({ status: 1, priority: 1 });
 
+// Fast lookup for hospital dashboards
+emergencyCaseSchema.index({ hospitalId: 1 });
+
+
 // ─────────────────────────────────────────
-// METHOD → assign hospital
+// METHODS
 // ─────────────────────────────────────────
+
+// Assign hospital
 emergencyCaseSchema.methods.assignHospital = function (hospitalId) {
   this.hospitalId = hospitalId;
-  this.status = "triaged";
+  this.status = "hospital_assigned";
   return this.save();
 };
 
 
-// ─────────────────────────────────────────
-// METHOD → assign ambulance
-// ─────────────────────────────────────────
+// Assign ambulance
 emergencyCaseSchema.methods.assignAmbulance = function (ambulanceId) {
   this.ambulanceId = ambulanceId;
-  this.status = "ambulance_assigned";
+  this.status = "ambulance_dispatched";
   return this.save();
 };
 
 
-// ─────────────────────────────────────────
-// METHOD → mark in transit
-// ─────────────────────────────────────────
+// Mark ambulance en route
 emergencyCaseSchema.methods.startTransport = function () {
   this.status = "in_transit";
   return this.save();
 };
 
 
-// ─────────────────────────────────────────
-// METHOD → assign doctor
-// ─────────────────────────────────────────
+// Assign doctor
 emergencyCaseSchema.methods.assignDoctor = function (doctorId) {
   this.doctorId = doctorId;
+  this.status = "doctor_assigned";
   return this.save();
 };
 
 
-// ─────────────────────────────────────────
-// METHOD → close emergency
-// ─────────────────────────────────────────
+// Mark treatment complete
+emergencyCaseSchema.methods.markTreated = function () {
+  this.status = "treated";
+  return this.save();
+};
+
+
+// Close emergency
 emergencyCaseSchema.methods.closeCase = function () {
   this.status = "closed";
   return this.save();

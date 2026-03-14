@@ -3,6 +3,8 @@ import { EmergencyCase } from "../models/emergency.model.js";
 
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
+import { io } from "../server.js";
+
 
 // ─────────────────────────────────────────
 // Create Doctor
@@ -10,22 +12,25 @@ import ApiError from "../utils/ApiError.js";
 // ─────────────────────────────────────────
 export const createDoctor = asyncHandler(async (req, res) => {
 
-const { name, specialization, experienceLevel, hospitalId } = req.body;
+  const { name, specialization, experienceLevel, hospitalId } = req.body;
 
-if (!name || !specialization || !hospitalId)
-throw new ApiError("Doctor name, specialization and hospital required", 400);
+  if (!name || !specialization || !hospitalId)
+    throw new ApiError("Doctor name, specialization and hospital required", 400);
 
-const doctor = await Doctor.create({
-name,
-specialization,
-experienceLevel,
-hospitalId
-});
+  const doctor = await Doctor.create({
+    name,
+    specialization,
+    experienceLevel,
+    hospitalId
+  });
 
-res.status(201).json({
-status: "success",
-doctor
-});
+  // 🔴 REALTIME EVENT
+  io.emit("doctor:new", doctor);
+
+  res.status(201).json({
+    status: "success",
+    doctor
+  });
 
 });
 
@@ -35,14 +40,14 @@ doctor
 // ─────────────────────────────────────────
 export const getDoctors = asyncHandler(async (_req, res) => {
 
-const doctors = await Doctor.find()
-.populate("hospitalId", "name location");
+  const doctors = await Doctor.find()
+    .populate("hospitalId", "name location");
 
-res.status(200).json({
-status: "success",
-results: doctors.length,
-doctors
-});
+  res.status(200).json({
+    status: "success",
+    results: doctors.length,
+    doctors
+  });
 
 });
 
@@ -52,16 +57,16 @@ doctors
 // ─────────────────────────────────────────
 export const getDoctorById = asyncHandler(async (req, res) => {
 
-const doctor = await Doctor.findById(req.params.id)
-.populate("hospitalId", "name");
+  const doctor = await Doctor.findById(req.params.id)
+    .populate("hospitalId", "name");
 
-if (!doctor)
-throw new ApiError("Doctor not found", 404);
+  if (!doctor)
+    throw new ApiError("Doctor not found", 404);
 
-res.status(200).json({
-status: "success",
-doctor
-});
+  res.status(200).json({
+    status: "success",
+    doctor
+  });
 
 });
 
@@ -72,19 +77,22 @@ doctor
 // ─────────────────────────────────────────
 export const updateDoctor = asyncHandler(async (req, res) => {
 
-const doctor = await Doctor.findByIdAndUpdate(
-req.params.id,
-req.body,
-{ new: true, runValidators: true }
-);
+  const doctor = await Doctor.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true, runValidators: true }
+  );
 
-if (!doctor)
-throw new ApiError("Doctor not found", 404);
+  if (!doctor)
+    throw new ApiError("Doctor not found", 404);
 
-res.status(200).json({
-status: "success",
-doctor
-});
+  // 🔴 REALTIME EVENT
+  io.emit("doctor:updated", doctor);
+
+  res.status(200).json({
+    status: "success",
+    doctor
+  });
 
 });
 
@@ -95,15 +103,20 @@ doctor
 // ─────────────────────────────────────────
 export const deleteDoctor = asyncHandler(async (req, res) => {
 
-const doctor = await Doctor.findByIdAndDelete(req.params.id);
+  const doctor = await Doctor.findByIdAndDelete(req.params.id);
 
-if (!doctor)
-throw new ApiError("Doctor not found", 404);
+  if (!doctor)
+    throw new ApiError("Doctor not found", 404);
 
-res.status(200).json({
-status: "success",
-message: "Doctor deleted"
-});
+  // 🔴 REALTIME EVENT
+  io.emit("doctor:deleted", {
+    doctorId: doctor._id
+  });
+
+  res.status(200).json({
+    status: "success",
+    message: "Doctor deleted"
+  });
 
 });
 
@@ -113,21 +126,27 @@ message: "Doctor deleted"
 // ─────────────────────────────────────────
 export const updateDoctorAvailability = asyncHandler(async (req, res) => {
 
-const { available } = req.body;
+  const { available } = req.body;
 
-const doctor = await Doctor.findById(req.params.id);
+  const doctor = await Doctor.findById(req.params.id);
 
-if (!doctor)
-throw new ApiError("Doctor not found", 404);
+  if (!doctor)
+    throw new ApiError("Doctor not found", 404);
 
-doctor.available = available;
+  doctor.available = available;
 
-await doctor.save();
+  await doctor.save();
 
-res.status(200).json({
-status: "success",
-doctor
-});
+  // 🔴 REALTIME EVENT
+  io.emit("doctor:availability", {
+    doctorId: doctor._id,
+    available: doctor.available
+  });
+
+  res.status(200).json({
+    status: "success",
+    doctor
+  });
 
 });
 
@@ -138,33 +157,39 @@ doctor
 // ─────────────────────────────────────────
 export const assignDoctorToEmergency = asyncHandler(async (req, res) => {
 
-const { emergencyId } = req.body;
+  const { emergencyId } = req.body;
 
-const doctor = await Doctor.findById(req.params.id);
+  const doctor = await Doctor.findById(req.params.id);
 
-if (!doctor)
-throw new ApiError("Doctor not found", 404);
+  if (!doctor)
+    throw new ApiError("Doctor not found", 404);
 
-if (!doctor.available)
-throw new ApiError("Doctor not available", 400);
+  if (!doctor.available)
+    throw new ApiError("Doctor not available", 400);
 
-const emergency = await EmergencyCase.findById(emergencyId);
+  const emergency = await EmergencyCase.findById(emergencyId);
 
-if (!emergency)
-throw new ApiError("Emergency not found", 404);
+  if (!emergency)
+    throw new ApiError("Emergency not found", 404);
 
-doctor.available = false;
-doctor.currentCaseId = emergency._id;
+  doctor.available = false;
+  doctor.currentCaseId = emergency._id;
 
-emergency.doctorId = doctor._id;
-emergency.status = "doctor_assigned";
+  emergency.doctorId = doctor._id;
+  emergency.status = "doctor_assigned";
 
-await doctor.save();
-await emergency.save();
+  await doctor.save();
+  await emergency.save();
 
-res.status(200).json({
-status: "success",
-emergency
-});
+  // 🔴 REALTIME EVENT
+  io.emit("doctor:assigned", {
+    doctorId: doctor._id,
+    emergencyId: emergency._id
+  });
+
+  res.status(200).json({
+    status: "success",
+    emergency
+  });
 
 });
