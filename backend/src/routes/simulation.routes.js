@@ -11,15 +11,13 @@ const router = Router();
 
 router.post(
   "/start",
-  protect,
-  restrict("operator"),
+ 
   startSimulation
 );
 
 router.post(
   "/stop",
-  protect,
-  restrict("operator"),
+  
   stopSimulation
 );
 

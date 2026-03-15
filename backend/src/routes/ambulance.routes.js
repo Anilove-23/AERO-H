@@ -17,17 +17,17 @@ const router = Router();
 // ── Public / Shared ─────────────────────────────────────
 
 // Get all ambulances
-router.get("/", protect, getAmbulances);
+router.get("/", getAmbulances);
 
 // Get single ambulance
-router.get("/:id", protect, getAmbulanceById);
+router.get("/:id", getAmbulanceById);
 
 // ── Hospital Admin Routes ───────────────────────────────
 
 // Create ambulance
 router.post(
 "/",
-protect,
+
 restrict("hospital_admin"),
 createAmbulance
 );
@@ -35,7 +35,7 @@ createAmbulance
 // Update ambulance info
 router.patch(
 "/:id",
-protect,
+
 restrict("hospital_admin"),
 updateAmbulance
 );
@@ -45,7 +45,7 @@ updateAmbulance
 // Update ambulance GPS location
 router.patch(
 "/:id/location",
-protect,
+
 updateAmbulanceLocation
 );
 
@@ -54,7 +54,7 @@ updateAmbulanceLocation
 // Dispatch ambulance to emergency
 router.post(
 "/:id/dispatch",
-protect,
+
 restrict("operator"),
 dispatchAmbulance
 );
@@ -62,7 +62,7 @@ dispatchAmbulance
 // Mark ambulance available again
 router.patch(
 "/:id/available",
-protect,
+
 restrict("operator"),
 markAmbulanceAvailable
 );

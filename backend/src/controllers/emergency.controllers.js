@@ -12,13 +12,41 @@ import { generateEmergencyAudio } from "../services/emergencyAudio.service.js";
 
 import { io } from "../server.js";
 
+/* ----------- NEW IMPORTS ----------- */
+import multer from "multer";
+import path from "path";
+
+
+/* ----------- FILE UPLOAD CONFIG ----------- */
+
+const storage = multer.diskStorage({
+
+  destination: (req, file, cb) => {
+    cb(null, "public/uploads");
+  },
+
+  filename: (req, file, cb) => {
+
+    const uniqueName =
+      Date.now() + "-" + Math.round(Math.random() * 1e9);
+
+    cb(null, uniqueName + path.extname(file.originalname));
+
+  }
+
+});
+
+export const upload = multer({ storage });
+
 
 // ─────────────────────────────────────────
 // Report Emergency
 // ─────────────────────────────────────────
 export const reportEmergency = asyncHandler(async (req, res) => {
 
-  const { symptoms, lat, lng } = req.body;
+  console.log("Body", req.body)
+
+  const { symptoms, lat, lng } = req.body || {};
 
   if (!symptoms || lat === undefined || lng === undefined) {
     throw new ApiError("Symptoms and location required", 400);
@@ -27,6 +55,18 @@ export const reportEmergency = asyncHandler(async (req, res) => {
   console.log("🚨 Emergency reported:", symptoms);
   console.log("📍 Location:", lat, lng);
 
+  /* ----------- FILE HANDLING ----------- */
+
+  let uploadedFile = null;
+
+  if (req.file) {
+
+    uploadedFile = `/uploads/${req.file.filename}`;
+
+    console.log("📂 Uploaded file:", uploadedFile);
+
+  }
+
   // ── Phase 1: Gemini Neural Triage
   const triage = await analyzeSymptoms(symptoms);
 
@@ -34,16 +74,23 @@ export const reportEmergency = asyncHandler(async (req, res) => {
 
   // ── Create Emergency Case
   const emergency = await EmergencyCase.create({
-    reportedBy: req.user._id,
+
+    reportedBy: req.user?._id || null,
+
     symptoms,
+    uploadedFile,
+
     severityScore: triage.severityScore,
     priority: triage.priority,
     requiredSpecialization: triage.requiredSpecialization,
+
     location: {
       type: "Point",
       coordinates: [lng, lat]
     },
+
     status: "reported"
+
   });
 
   // 🔴 REALTIME EVENT
@@ -129,7 +176,6 @@ export const reportEmergency = asyncHandler(async (req, res) => {
       ambulance.status = "dispatched";
       ambulance.currentEmergencyId = emergency._id;
 
-      // ✅ FIX: ensure hospitalId exists before saving
       if (!ambulance.hospitalId) {
 
         if (allocation?.hospitalId) {
@@ -185,6 +231,7 @@ export const reportEmergency = asyncHandler(async (req, res) => {
   }
 
   await emergency.save();
+
 
   // ─────────────────────────
   // Dynamic Emergency Audio Response
@@ -434,4 +481,6 @@ export const closeEmergency = asyncHandler(async (req, res) => {
     message: "Emergency closed",
     emergency
   });
+
 });
+

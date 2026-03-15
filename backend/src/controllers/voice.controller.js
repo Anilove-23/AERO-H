@@ -20,38 +20,41 @@ export const voiceEmergency = async (req, res) => {
 
     const audioPath = req.file.path;
 
-    // Convert speech → text
-    const transcript = await speechToText(audioPath);
+    // 🧠 Convert speech → text
+    const transcript = await speechToText(
+      audioPath,
+      req.file.mimetype
+    );
 
     fs.unlinkSync(audioPath);
 
-    // Send to existing emergency API
+    console.log("🎤 Voice transcript:", transcript);
+
+    // Send transcript to existing emergency API
     const emergency = await axios.post(
       "http://localhost:8000/api/v1/emergencies",
       {
         symptoms: transcript,
         lat: req.body.lat,
         lng: req.body.lng
-      },
-      {
-        headers: {
-          Authorization: req.headers.authorization
-        }
       }
     );
 
     res.json({
+      status: "success",
       transcript,
       emergency: emergency.data
     });
 
   } catch (error) {
 
-    console.error(error);
+    console.error("Voice emergency error:", error);
 
     res.status(500).json({
       status: "error",
       message: "Voice emergency failed"
     });
 
-  }}
+  }
+
+};

@@ -1,5 +1,6 @@
 import { Doctor } from "../models/doctor.model.js";
 import { EmergencyCase } from "../models/emergency.model.js";
+import { Hospital } from "../models/hospital.model.js";
 
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
@@ -14,14 +15,27 @@ export const createDoctor = asyncHandler(async (req, res) => {
 
   const { name, specialization, experienceLevel, hospitalId } = req.body;
 
-  if (!name || !specialization || !hospitalId)
-    throw new ApiError("Doctor name, specialization and hospital required", 400);
+  if (!name || !specialization)
+    throw new ApiError("Doctor name and specialization required", 400);
+
+  let finalHospitalId = hospitalId;
+
+  // If hospital not provided → auto assign first hospital
+  if (!finalHospitalId) {
+
+    const hospital = await Hospital.findOne();
+
+    if (!hospital)
+      throw new ApiError("No hospitals available to assign doctor", 400);
+
+    finalHospitalId = hospital._id;
+  }
 
   const doctor = await Doctor.create({
     name,
     specialization,
     experienceLevel,
-    hospitalId
+    hospitalId: finalHospitalId
   });
 
   // 🔴 REALTIME EVENT
