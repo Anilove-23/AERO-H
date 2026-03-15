@@ -10,26 +10,34 @@ export const generateEmergencyAudio = async (text) => {
 
   try {
 
-    const audio = await elevenlabs.generate({
-      voice: "Rachel",
-      model_id: "eleven_multilingual_v2",
-      text
-    });
+    // ensure folder exists
+    if (!fs.existsSync("public/audio")) {
+      fs.mkdirSync("public/audio", { recursive: true });
+    }
+
+    const audio = await elevenlabs.textToSpeech.convert(
+      "21m00Tcm4TlvDq8ikWAM",
+      {
+        text: text,
+        model_id: "eleven_multilingual_v2"
+      }
+    );
 
     const filename = `emergency_${Date.now()}.mp3`;
-
     const filepath = path.join("public/audio", filename);
 
-    const stream = fs.createWriteStream(filepath);
+    const buffer = Buffer.from(await audio.arrayBuffer());
 
-    audio.pipe(stream);
+    fs.writeFileSync(filepath, buffer);
 
     return `/audio/${filename}`;
 
   } catch (err) {
 
-    console.log("ElevenLabs error:", err);
+    console.log("⚠️ ElevenLabs failed → fallback activated");
+    console.log(err.message);
 
+    // fallback: no audio but system continues
     return null;
 
   }

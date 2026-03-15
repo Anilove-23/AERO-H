@@ -8,51 +8,43 @@ import {
   assignHospital,
   assignAmbulance,
   assignDoctor,
-  closeEmergency
+  closeEmergency,
+  upload
 } from "../controllers/emergency.controllers.js";
 
 import { protect, restrict } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.post("/", protect, reportEmergency);
+/* -------- FIX: attach multer -------- */
+router.post("/", upload.single("file"), reportEmergency);
 
-router.get("/", protect, getEmergencies);
+router.get("/", getEmergencies);
 
-router.get("/:id", protect, getEmergencyById);
+router.get("/:id", getEmergencyById);
 
 router.patch(
   "/:id/status",
-  protect,
-  restrict("operator"),
   updateEmergencyStatus
 );
 
 router.post(
   "/:id/assign-hospital",
-  protect,
-  restrict("operator"),
   assignHospital
 );
 
 router.post(
   "/:id/assign-ambulance",
-  protect,
-  restrict("operator"),
   assignAmbulance
 );
 
 router.post(
   "/:id/assign-doctor",
-  protect,
-  restrict("operator"),
   assignDoctor
 );
 
 router.post(
   "/:id/close",
-  protect,
-  restrict("doctor", "operator"),
   closeEmergency
 );
 

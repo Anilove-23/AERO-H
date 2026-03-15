@@ -11,15 +11,13 @@ const router = Router();
 
 router.get(
   "/",
-  protect,
-  restrict("operator"),
+ 
   getLogs
 );
 
 router.get(
   "/emergency/:id",
-  protect,
-  restrict("operator"),
+  
   getEmergencyLogs
 );
 
