@@ -3,26 +3,45 @@ import fs from "fs";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-export const speechToText = async (audioPath) => {
+export const speechToText = async (audioPath, mimeType) => {
 
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash"
-  });
+  try {
 
-  const audioBuffer = fs.readFileSync(audioPath);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash"
+    });
 
-  const result = await model.generateContent([
-    {
-      inlineData: {
-        mimeType: "audio/wav",
-        data: audioBuffer.toString("base64")
+    const audioBuffer = fs.readFileSync(audioPath);
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: mimeType,
+          data: audioBuffer.toString("base64")
+        }
+      },
+      {
+        text: `
+Convert this emergency audio into SHORT medical symptoms.
+
+Return only symptoms text.
+
+Example outputs:
+"chest pain and breathing difficulty"
+"severe bleeding from leg"
+"high fever and vomiting"
+`
       }
-    },
-    {
-      text: "Convert this emergency audio into clear text describing the symptoms."
-    }
-  ]);
+    ]);
 
-  const response = result.response.text();
+    return result.response.text().trim();
 
-  return response }
+  } catch (error) {
+
+    console.log("⚠️ Gemini speech failed → fallback");
+
+    return "voice emergency reported";
+
+  }
+
+};
